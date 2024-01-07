@@ -1,24 +1,23 @@
 import React, { useEffect, useState } from "react";
-import { ethers } from "ethers";
+import { ethers, utils } from "ethers";
 import {
   DAIMOND_ADDRESS,
   FACETCUT,
   ZEROADDRESS,
 } from "../utils/constent/constent.ts";
 import { CONTRACT_A_ABI, DAIMOND_CUT_ABI } from "../utils/Abi/diamondCutABI.js";
+import { useWeb3ModalAccount, useWeb3ModalProvider } from "@web3modal/ethers5/react";
 
 function ContractInteractionComponent() {
+  const { address, chainId, isConnected } = useWeb3ModalAccount()
+  const { walletProvider } = useWeb3ModalProvider()
+
   const [contractInstance, setContractInstance] = useState(null);
   const [getterResult, setGetterResult] = useState("");
   const [setterValue, setSetterValue] = useState("");
   const [newAdmin, setNewAdmin] = useState("");
   const [adminAddress, setAdminAddress] = useState("");
   const [signer, setSigner] = useState("");
-const [isConnected,setIsConnected] = useState(false)
-const [isPolygonTestnet, setIsPolygonTestnet] = useState(false);
-const [availableNetworks, setAvailableNetworks] = useState([]);
-const[address,setAddress] = useState()
-const [selectedNetwork, setSelectedNetwork] = useState('');
   const containerStyle = {
     fontFamily: "Arial, sans-serif",
     padding: "20px",
@@ -27,25 +26,6 @@ const [selectedNetwork, setSelectedNetwork] = useState('');
     boxShadow: "0 0 10px rgba(0, 0, 0, 0.1)",
     maxWidth: "400px",
     margin: "0 auto",
-  };
-  const connectButtonStyle = {
-    position: 'absolute',
-    top: '10px',
-    left: '10px',
-    padding: '8px 16px',
-    borderRadius: '4px',
-    backgroundColor: '#4285f4',
-    color: '#fff',
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: '16px',
-  };
-  const dropdownStyle = {
-    padding: '8px',
-    borderRadius: '4px',
-    border: '1px solid #ccc',
-    margin: '8px',
-    width: '200px',
   };
   const buttonStyle = {
     padding: "8px 16px",
@@ -65,46 +45,33 @@ const [selectedNetwork, setSelectedNetwork] = useState('');
     margin: "8px",
     width: "200px",
   };
-  const loadContract = async () => {
-    try {
-      if (window.ethereum) {
-        await window.ethereum.request({ method: "eth_requestAccounts" });
-        setIsConnected(true);
-
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
-        const signer = provider.getSigner();
+  const  loadContract = async () => {
+        const ethersProvider =  new ethers.providers.Web3Provider(walletProvider)
+        const signer = await ethersProvider.getSigner()    
         setSigner(signer);
         const contract = new ethers.Contract(
           DAIMOND_ADDRESS,
           CONTRACT_A_ABI,
           signer
         );
-        console.log(contract);
         setContractInstance(contract);
-        setAddress(await signer.getAddress())
-        // Call a contract function (Example: Get the contract value)
-        //   const value = await contract.getContractValue();
-        //   setContractValue(value);
-      } else {
-        setIsConnected(false);
-      }
-    } catch (error) {
-      console.error("Error loading contract:", error);
-    }
   };
 
   const handleGetter = async () => {
     try {  
-        // await contractInstance.initialize()
-        // await contractInstance.initializeFunc()
       const result = await contractInstance.getNum()
       const formattedResult = ethers.utils.formatUnits(result, 18); // Assuming it's in 18 decimals
       setGetterResult(formattedResult.toString());
 
     } catch (error) {
-      console.error("Error calling getter function:", error);
-      console.log(error)
-      alert(error?.data?.message || " ")
+      console.error("Error changing admin:", error);
+      if (error.code === 'CALL_EXCEPTION') {
+        // Transaction reverted
+        alert("User is not admin");
+      } else {
+        // Other error occurred
+        alert("An error occurred. Please try again.");
+      }
     }
   };
 
@@ -116,8 +83,14 @@ const [selectedNetwork, setSelectedNetwork] = useState('');
       await tx.wait();
       alert("Transasction Done")
     } catch (error) {
-      console.error("Error calling setter function:", error);
-      alert(error?.data?.message || " ")
+      console.error("Error changing admin:", error);
+      if (error.code === 'CALL_EXCEPTION') {
+        // Transaction reverted
+        alert("User is not admin");
+      } else {
+        // Other error occurred
+        alert("An error occurred. Please try again.");
+      }
     }
   };
 
@@ -158,8 +131,14 @@ const initNewContract =  async()=>{
       setAdminAddress(admin);
       
     } catch (error) {
-      console.error("Error getting admin address:", error);
-      alert(error?.data?.message || " ")
+      console.error("Error changing admin:", error);
+      if (error.code === 'CALL_EXCEPTION') {
+        // Transaction reverted
+        alert("User is not admin");
+      } else {
+        // Other error occurred
+        alert("An error occurred. Please try again.");
+      }
     }
   };
 
@@ -167,49 +146,30 @@ const initNewContract =  async()=>{
     try {
       const tx = await contractInstance.changeAdmin(newAdmin);
       await tx.wait();
-      alert("Transasction Done")
+      alert("Transaction Done");
     } catch (error) {
       console.error("Error changing admin:", error);
-      alert(error?.data?.message || " ")
-
+      if (error.code === 'CALL_EXCEPTION') {
+        // Transaction reverted
+        alert("User is not admin");
+      } else {
+        // Other error occurred
+        alert("An error occurred. Please try again.");
+      }
     }
+    
   };
-  async function checkNetwork() {
-    try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const network = await provider.getNetwork();
-      console.log(network)
-      setIsPolygonTestnet(network.chainId === 97);
-
-      const networks = await window.ethereum.request({ method: 'wallet_getEthereumChain' });
-      setAvailableNetworks(networks.filter(net => net.chainId !== network.chainId));
-
-    } catch (error) {
-      console.error('Error fetching network:', error);
-    }
-  }
-
 
   useEffect(() => {
-    checkNetwork();
-    // loadContract();
-  }, []);
-
-
-if(!isPolygonTestnet){
-  return ( <div style={containerStyle}>
-    <h1 style={{ textAlign: "center" }}>Please switch to  BNB Tesnet</h1> 
-   
-    </div>)
+  if(isConnected){
+    loadContract();
   }
+
+  }, [isConnected]);
+
   return (
     <div style={containerStyle}>
-        <button style={connectButtonStyle} onClick={loadContract}>
-        {isConnected  ? "Connected" : "Connect"}
-      </button>
-
       <h1 style={{ textAlign: "center" }}>Dimond Contract Interactions</h1>
-      <h4 style={{ textAlign: "flex" }}> {address ? `connected to: ${address}` : "Connect wallet"}</h4>
       <div style={{ textAlign: "center" }}>
         <button style={buttonStyle} onClick={handleGetter}>
           Get Value
